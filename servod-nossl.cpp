@@ -19,6 +19,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/wait.h>
+#include <sqlite3.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 8192
@@ -41,6 +42,34 @@ std::string get_mime_type(const std::string& path) {
     if (path.ends_with(".gif")) return "image/gif";
     if (path.ends_with(".php")) return "text/html";
     return "application/octet-stream";
+}
+
+void handle_sql_query(SSL* ssl, const std::string& query) {
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_open("webdata.db", &db) != SQLITE_OK) {
+        send_response(ssl, "500 Internal Server Error", "text/plain", "Database error");
+        return;
+    }
+
+    std::ostringstream result;
+    if (sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        int cols = sqlite3_column_count(stmt);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            for (int i = 0; i < cols; ++i) {
+                result << sqlite3_column_name(stmt, i) << "="
+                       << (const char*)sqlite3_column_text(stmt, i) << "; ";
+            }
+            result << "\\n";
+        }
+    } else {
+        result << "SQL error: " << sqlite3_errmsg(db);
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+    send_response(ssl, "200 OK", "text/plain", result.str());
 }
 
 void send_response(int client_fd, const std::string& status, const std::string& content_type, const std::string& body) {
@@ -121,6 +150,12 @@ void handle_client(int client_fd) {
         query_string = url.substr(qs_pos + 1);
         url = url.substr(0, qs_pos);
     }
+
+if (url.starts_with("/query") && method == "GET") {
+    std::string sql = query_string.substr(query_string.find("sql=") + 4);
+    sql = url_decode(sql);  // You'll need a helper to decode %20 etc.
+    handle_sql_query(ssl, sql);
+}
 
     std::string filepath = WEBROOT + url;
     if (filepath.back() == '/') filepath += "index.html";
