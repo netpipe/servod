@@ -91,9 +91,35 @@ void handle_php_cgi(SSL* ssl, const std::string& path, const std::string& query_
         std::ostringstream output;
         char buffer[BUFFER_SIZE];
         ssize_t bytes;
-        while ((bytes = read(cgi_output[0], buffer, BUFFER_SIZE)) > 0) {
-            output.write(buffer, bytes);
-        }
+std::ostringstream raw_output;
+while ((bytes = read(cgi_output[0], buffer, BUFFER_SIZE)) > 0) {
+    raw_output.write(buffer, bytes);
+}
+
+std::string full_output = raw_output.str();
+
+// Find header/body split — marked by double CRLF
+size_t header_end = full_output.find("\r\n\r\n");
+if (header_end == std::string::npos) {
+    // fallback if LF only
+    header_end = full_output.find("\n\n");
+}
+
+std::string headers, body;
+if (header_end != std::string::npos) {
+    headers = full_output.substr(0, header_end);
+    body = full_output.substr(header_end + ((full_output[header_end] == '\r') ? 4 : 2));
+} else {
+    // No headers found, treat all as body
+    body = full_output;
+}
+
+// (Optional) parse Content-Type or other headers if needed
+
+// Send body only (or repackage with your own HTTP headers)
+output << body;
+
+
         close(cgi_output[0]);
         waitpid(pid, NULL, 0);
 
