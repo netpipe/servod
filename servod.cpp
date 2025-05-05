@@ -165,7 +165,25 @@ void handle_client(SSL* ssl) {
     }
 
     std::string filepath = WEBROOT + url;
-    if (filepath.back() == '/') filepath += "index.html";
+   // if (filepath.back() == '/') filepath += "index.html";
+//std::string full_path = www_root + request_path;
+
+// If it's a directory, try to find index files
+struct stat path_stat;
+if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+    if (filepath.back() != '/')
+        filepath += '/';  // make sure path ends in '/'
+
+    std::vector<std::string> index_files = {"index.php", "index.html"};
+
+    for (const auto& fname : index_files) {
+        std::string index_path = filepath + fname;
+        if (stat(index_path.c_str(), &path_stat) == 0) {
+            filepath = index_path;
+            break;
+        }
+    }
+}
 
     struct stat st;
     if (stat(filepath.c_str(), &st) == -1) {
