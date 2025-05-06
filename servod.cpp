@@ -37,6 +37,7 @@
 
 int HTTP_PORT = 8080;
 int HTTPS_PORT = 8443;
+bool https_enabled = false;
 
 
 std::unordered_map<std::string, std::string> vhosts = {
@@ -210,7 +211,7 @@ while (std::getline(request2, line) && line != "\r") {
 }
 std::string root = WEBROOT;
 if (vhosts.count(host)) {
-    root = vhosts[host];
+//    root = vhosts[host];
 }
 
     std::string query_string;
@@ -220,10 +221,16 @@ if (vhosts.count(host)) {
         url = url.substr(0, qs_pos);
     }
     
-    std::string filepath = root + url;
+    std::string filepath = WEBROOT + url;
    // if (filepath.back() == '/') filepath += "index.html";
+   if (url == "/favicon.ico") {
+    send_response(client,ssl, "204 No Content", "image/x-icon", "");
+        if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
+    close(client);
+    return;
+}
 // If SSL is not used, redirect to HTTPS
-if (!ssl) {
+if (!ssl && https_enabled) {
     redirect_to_https(client, host, filepath,HTTPS_PORT);
     return;
 }
@@ -332,11 +339,12 @@ int main(int argc, char* argv[]) {
     if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0 ||
         SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
-        return 1;
+     //   return 1;
     }
 
     int http_sock = create_listening_socket(HTTP_PORT);
-    int https_sock = create_listening_socket(HTTPS_PORT);
+	int https_sock = https_enabled ? create_listening_socket(HTTPS_PORT) : -1;
+
         fd_set readfds;
     int maxfd = std::max(http_sock, https_sock) + 1;
 
@@ -369,8 +377,9 @@ if (SSL_accept(ssl) <= 0) {
     ERR_print_errors_fp(stderr);
     SSL_free(ssl);
     close(client2);
+    https_enabled =0;
     continue;
-} else {
+} else {https_enabled =1;
                 std::thread(handle_client, client2, ssl).detach();
           }}
     }
