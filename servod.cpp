@@ -63,6 +63,17 @@ std::string get_mime_type(const std::string& path) {
     return "application/octet-stream";
 }
 
+void redirect_to_https(int client, const std::string& host, const std::string& path, int https_port) {
+    std::ostringstream response;
+    response << "HTTP/1.1 301 Moved Permanently\r\n"
+             << "Location: https://" << host << ":" << https_port << path << "\r\n"
+             << "Connection: close\r\n"
+             << "Content-Length: 0\r\n\r\n";
+    send(client, response.str().c_str(), response.str().size(), 0);
+    close(client);
+}
+
+
 void send_response(int client, SSL* ssl, const std::string& status, const std::string& content_type, const std::string& body) {
     std::ostringstream oss;
     oss << "HTTP/1.0 " << status << "\r\n"
@@ -193,7 +204,7 @@ void handle_client(int client,SSL* ssl = nullptr) {
 while (std::getline(request2, line) && line != "\r") {
     if (line.find("Host:") != std::string::npos)
         host = line.substr(line.find(":") + 2);
-    //host = host.substr(0, host.find(":"));
+    host = host.substr(0, host.find(":"));
     // ... other header parsing
 }
 std::string root = WEBROOT;
@@ -210,8 +221,11 @@ if (vhosts.count(host)) {
     
     std::string filepath = root + url;
    // if (filepath.back() == '/') filepath += "index.html";
-
-
+// If SSL is not used, redirect to HTTPS
+if (!ssl) {
+    redirect_to_https(client, host, filepath,HTTPS_PORT);
+    return;
+}
 // If it's a directory, try to find index files
 struct stat path_stat;
 if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
