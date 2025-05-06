@@ -166,7 +166,6 @@ void handle_client(SSL* ssl) {
 
     std::string filepath = WEBROOT + url;
    // if (filepath.back() == '/') filepath += "index.html";
-//std::string full_path = www_root + request_path;
 
 // If it's a directory, try to find index files
 struct stat path_stat;
