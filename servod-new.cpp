@@ -1,5 +1,5 @@
 // Single-file HTTP + HTTPS Web Server with PHP/CGI and SQLite support
-// Compile with: g++ -std=c++17 -O2 -o webserver webserver.cpp -lssl -lcrypto
+// Compile with: g++ -std=c++20 -O2 -o webserver webserver.cpp -lssl -lcrypto
 
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -25,6 +25,12 @@
 #define BUFFER_SIZE 8192
 
 const std::string www_root = "www";
+
+std::unordered_map<std::string, std::string> vhosts = {
+    {"localhost", "www"},
+    {"example.com", "www/example"},
+    {"test.local",  "www/testsite"},
+};
 
 std::unordered_map<std::string, std::string> mime_types = {
     {".html", "text/html"},
@@ -94,6 +100,7 @@ void run_php_script(int client, const std::string& script_path, const std::strin
         setenv("REQUEST_METHOD", method.c_str(), 1);
         setenv("CONTENT_TYPE", content_type.c_str(), 1);
         setenv("CONTENT_LENGTH", std::to_string(content_length).c_str(), 1);
+setenv("REDIRECT_STATUS", "200", 1);
         execlp("php-cgi", "php-cgi", nullptr);
         exit(1);
     } else {
@@ -162,8 +169,20 @@ void handle_request(int client, SSL* ssl = nullptr) {
         }
     }
 
+std::string host = "localhost";  // default fallback
+while (std::getline(request, line) && line != "\r") {
+    if (line.find("Host:") != std::string::npos)
+        host = line.substr(line.find(":") + 2);
+    // ... other header parsing
+}
+std::string root = www_root;
+if (vhosts.count(host)) {
+    root = vhosts[host];
+}
+
+
     if (path == "/") path = "/index.php";
-    std::string full_path = www_root + path;
+    std::string full_path = root + path;
 
     struct stat st;
     if (stat(full_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
@@ -197,9 +216,21 @@ void handle_request(int client, SSL* ssl = nullptr) {
 
 int main() {
     SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
     SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
-    SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM);
-    SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM);
+    if (!ctx) {
+        ERR_print_errors_fp(stderr);
+        return 1;
+    }
+if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0 ||
+    SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0) {
+    ERR_print_errors_fp(stderr);
+    return 1;
+}
+
+
 
     int http_sock = create_listening_socket(HTTP_PORT);
     int https_sock = create_listening_socket(HTTPS_PORT);
@@ -228,12 +259,14 @@ int main() {
             int client = accept(https_sock, nullptr, nullptr);
             SSL* ssl = SSL_new(ctx);
             SSL_set_fd(ssl, client);
-            if (SSL_accept(ssl) <= 0) {
-                SSL_free(ssl);
-                close(client);
-            } else {
+if (SSL_accept(ssl) <= 0) {
+    ERR_print_errors_fp(stderr);
+    SSL_free(ssl);
+    close(client);
+    continue;  // <-- Add this
+} else {
                 std::thread(handle_request, client, ssl).detach();
-            }
+          }
         }
     }
 
