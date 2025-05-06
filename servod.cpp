@@ -340,7 +340,7 @@ int main(int argc, char* argv[]) {
     }
 
     int http_sock = create_listening_socket(HTTP_PORT);
-    int https_sock = create_listening_socket(HTTPS_PORT);
+	int https_sock = https_enabled ? create_listening_socket(HTTPS_PORT) : -1;
         fd_set readfds;
     int maxfd = std::max(http_sock, https_sock) + 1;
 
