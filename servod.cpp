@@ -29,15 +29,12 @@
 #include <vector>
 #include <string>
 
-
-
+int HTTP_PORT = 8080;
+int HTTPS_PORT = 8443;
+bool https_enabled = true;
 #define BUFFER_SIZE 8192
 #define WEBROOT "./www"
 #define UPLOAD_DIR "./uploads"
-
-int HTTP_PORT = 8080;
-int HTTPS_PORT = 8443;
-bool https_enabled = false;
 
 
 std::unordered_map<std::string, std::string> vhosts = {
@@ -64,17 +61,6 @@ std::string get_mime_type(const std::string& path) {
     if (path.ends_with(".php")) return "text/html";
     return "application/octet-stream";
 }
-
-void redirect_to_https(int client, const std::string& host, const std::string& path, int https_port) {
-    std::ostringstream response;
-    response << "HTTP/1.1 301 Moved Permanently\r\n"
-             << "Location: https://" << host << ":" << https_port << path << "\r\n"
-             << "Connection: close\r\n"
-             << "Content-Length: 0\r\n\r\n";
-    send(client, response.str().c_str(), response.str().size(), 0);
-    close(client);
-}
-
 
 void send_response(int client, SSL* ssl, const std::string& status, const std::string& content_type, const std::string& body) {
     std::ostringstream oss;
@@ -164,6 +150,16 @@ output << body;
     }
 }
 
+void redirect_to_https(int client, const std::string& host, const std::string& path, int https_port) {
+    std::ostringstream response;
+    response << "HTTP/1.1 301 Moved Permanently\r\n"
+             << "Location: https://" << host << ":" << https_port << path << "\r\n"
+             << "Connection: close\r\n"
+             << "Content-Length: 0\r\n\r\n";
+    send(client, response.str().c_str(), response.str().size(), 0);
+    close(client);
+}
+
 std::string save_uploaded_file(const std::string& data, const std::string& boundary) {
     size_t start = data.find("\r\n\r\n");
     if (start == std::string::npos) return "";
@@ -206,12 +202,12 @@ void handle_client(int client,SSL* ssl = nullptr) {
 while (std::getline(request2, line) && line != "\r") {
     if (line.find("Host:") != std::string::npos)
         host = line.substr(line.find(":") + 2);
-    host = host.substr(0, host.find(":"));
+    //host = host.substr(0, host.find(":"));
     // ... other header parsing
 }
 std::string root = WEBROOT;
 if (vhosts.count(host)) {
-//    root = vhosts[host];
+    root = vhosts[host];
 }
 
     std::string query_string;
@@ -221,18 +217,19 @@ if (vhosts.count(host)) {
         url = url.substr(0, qs_pos);
     }
     
-    std::string filepath = WEBROOT + url;
+    std::string filepath = root + url;
    // if (filepath.back() == '/') filepath += "index.html";
-   if (url == "/favicon.ico") {
-    send_response(client,ssl, "204 No Content", "image/x-icon", "");
-        if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
-    close(client);
-    return;
-}
+   
 // If SSL is not used, redirect to HTTPS
-if (!ssl && https_enabled) {
-    redirect_to_https(client, host, filepath,HTTPS_PORT);
-    return;
+if (!ssl) {
+   // redirect_to_https(client, host, filepath,HTTPS_PORT);
+  //  return;
+}
+   if (url == "/favicon.ico") {
+   // send_response(client,ssl, "204 No Content", "image/x-icon", "");
+   //     if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
+  //  close(client);
+  //  return;
 }
 // If it's a directory, try to find index files
 struct stat path_stat;
@@ -312,7 +309,7 @@ int create_listening_socket(int port) {
 }
 
 int main(int argc, char* argv[]) {
-	    // Parse command-line arguments
+	// Parse command-line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if ((arg == "--http" || arg == "-h") && i + 1 < argc) {
@@ -324,7 +321,7 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
-        mkdir(UPLOAD_DIR, 0755);
+    mkdir(UPLOAD_DIR, 0755);
     SSL_library_init();
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
@@ -339,18 +336,16 @@ int main(int argc, char* argv[]) {
     if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0 ||
         SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
-     //   return 1;
+        return 1;
     }
 
     int http_sock = create_listening_socket(HTTP_PORT);
-	int https_sock = https_enabled ? create_listening_socket(HTTPS_PORT) : -1;
-
+    int https_sock = create_listening_socket(HTTPS_PORT);
         fd_set readfds;
     int maxfd = std::max(http_sock, https_sock) + 1;
 
-    std::cout << "HTTP on port " << HTTP_PORT << ", HTTPS on port " << HTTPS_PORT << std::endl;
   //  log("HTTPS Server started on port " + std::to_string(PORT));
-
+    std::cout << "HTTP on port " << HTTP_PORT << ", HTTPS on port " << HTTPS_PORT << std::endl;
     while (true) {
 
         FD_ZERO(&readfds);
@@ -377,9 +372,9 @@ if (SSL_accept(ssl) <= 0) {
     ERR_print_errors_fp(stderr);
     SSL_free(ssl);
     close(client2);
-    https_enabled =0;
+        https_enabled =0;
     continue;
-} else {https_enabled =1;
+} else {
                 std::thread(handle_client, client2, ssl).detach();
           }}
     }
