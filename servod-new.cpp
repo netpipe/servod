@@ -173,6 +173,7 @@ std::string host = "localhost";  // default fallback
 while (std::getline(request, line) && line != "\r") {
     if (line.find("Host:") != std::string::npos)
         host = line.substr(line.find(":") + 2);
+    host = host.substr(0, host.find(":"));
     // ... other header parsing
 }
 std::string root = www_root;
@@ -215,6 +216,8 @@ if (vhosts.count(host)) {
 }
 
 int main() {
+	    signal(SIGCHLD, SIG_IGN); // Prevent zombie processes
+
     SSL_library_init();
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
@@ -229,8 +232,6 @@ if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0 ||
     ERR_print_errors_fp(stderr);
     return 1;
 }
-
-
 
     int http_sock = create_listening_socket(HTTP_PORT);
     int https_sock = create_listening_socket(HTTPS_PORT);
@@ -259,6 +260,7 @@ if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0 ||
             int client = accept(https_sock, nullptr, nullptr);
             SSL* ssl = SSL_new(ctx);
             SSL_set_fd(ssl, client);
+           
 if (SSL_accept(ssl) <= 0) {
     ERR_print_errors_fp(stderr);
     SSL_free(ssl);

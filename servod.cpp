@@ -21,11 +21,26 @@
 #include <sys/wait.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <sstream>
+#include <fstream>
+#include <iostream>
+#include <cstring>
+#include <unordered_map>
 
-#define PORT 8443
+
+
+#define HTTP_PORT 8080
+#define HTTPS_PORT 8443
 #define BUFFER_SIZE 8192
 #define WEBROOT "./www"
 #define UPLOAD_DIR "./uploads"
+
+
+std::unordered_map<std::string, std::string> vhosts = {
+    {"localhost", "www"},
+    {"example.com", "www/example"},
+    {"test.local",  "www/testsite"},
+};
 
 std::mutex log_mutex;
 
@@ -143,12 +158,13 @@ std::string save_uploaded_file(const std::string& data, const std::string& bound
     return filename;
 }
 
-void handle_client(SSL* ssl) {
-    char buffer[BUFFER_SIZE] = {0};
-    int received = SSL_read(ssl, buffer, BUFFER_SIZE - 1);
-    if (received <= 0) {
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
+void handle_client(int client,SSL* ssl = nullptr) {
+    char buffer[BUFFER_SIZE];
+    int bytes = ssl ? SSL_read(ssl, buffer, BUFFER_SIZE) : recv(client, buffer, BUFFER_SIZE, 0);
+    std::cout << "Received " << bytes << " bytes from client\n";
+        if (bytes <= 0) {
+        if (ssl) SSL_free(ssl);
+        close(client);
         return;
     }
 
@@ -157,15 +173,20 @@ void handle_client(SSL* ssl) {
     std::string method, url, version;
     iss >> method >> url >> version;
 
+    
+    
     std::string query_string;
     size_t qs_pos = url.find('?');
     if (qs_pos != std::string::npos) {
         query_string = url.substr(qs_pos + 1);
         url = url.substr(0, qs_pos);
     }
+    
 
+// std::string filepath = root + url;
     std::string filepath = WEBROOT + url;
    // if (filepath.back() == '/') filepath += "index.html";
+
 
 // If it's a directory, try to find index files
 struct stat path_stat;
@@ -188,8 +209,7 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
     if (stat(filepath.c_str(), &st) == -1) {
         send_response(ssl, "404 Not Found", "text/plain", "404 Not Found");
         log("404 for " + filepath);
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
+    if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
         return;
     }
 
@@ -211,7 +231,8 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
             }
         }
     }
-
+   
+   
     if (filepath.ends_with(".php")) {
         handle_php_cgi(ssl, filepath, query_string, method, post_data);
     } else if (url == "/upload" && method == "POST") {
@@ -225,9 +246,23 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
         oss << file.rdbuf();
         send_response(ssl, "200 OK", get_mime_type(filepath), oss.str());
     }
+    
+    if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
+    close(client);
+}
+int create_listening_socket(int port) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+
+    bind(sock, (sockaddr*)&addr, sizeof(addr));
+    listen(sock, SOMAXCONN);
+    return sock;
 }
 
 int main() {
@@ -249,38 +284,47 @@ int main() {
         return 1;
     }
 
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    int opt = 1;
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    int http_sock = create_listening_socket(8080);
+    int https_sock = create_listening_socket(8443);
+        fd_set readfds;
+    int maxfd = std::max(http_sock, https_sock) + 1;
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(PORT);
-
-    bind(server_fd, (sockaddr*)&addr, sizeof(addr));
-    listen(server_fd, 16);
-
-    log("HTTPS Server started on port " + std::to_string(PORT));
+  //  log("HTTPS Server started on port " + std::to_string(PORT));
 
     while (true) {
-        sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-        int client_fd = accept(server_fd, (sockaddr*)&client_addr, &client_len);
-        SSL* ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, client_fd);
-        if (SSL_accept(ssl) <= 0) {
-            ERR_print_errors_fp(stderr);
-            close(client_fd);
-            SSL_free(ssl);
-            continue;
+
+        FD_ZERO(&readfds);
+        FD_SET(http_sock, &readfds);
+        FD_SET(https_sock, &readfds);
+
+        if (select(maxfd, &readfds, nullptr, nullptr, nullptr) < 0) {
+            perror("select");
+            break;
         }
-        std::thread([ssl]() {
-            handle_client(ssl);
-        }).detach();
+
+        if (FD_ISSET(http_sock, &readfds)) {
+            int client = accept(http_sock, nullptr, nullptr);
+            std::thread(handle_client, client, nullptr).detach();
+           
+        }
+
+        if (FD_ISSET(https_sock, &readfds)) {
+            int client2 = accept(https_sock, nullptr, nullptr);
+            SSL* ssl = SSL_new(ctx);
+            SSL_set_fd(ssl, client2);
+           
+if (SSL_accept(ssl) <= 0) {
+    ERR_print_errors_fp(stderr);
+    SSL_free(ssl);
+    close(client2);
+    continue;  // <-- Add this
+} else {
+                std::thread(handle_client, client2, ssl).detach();
+          }}
     }
 
-    close(server_fd);
+close(http_sock);
+    close(https_sock);
     SSL_CTX_free(ctx);
     return 0;
 }
