@@ -327,6 +327,7 @@ int main() {
         fd_set readfds;
     int maxfd = std::max(http_sock, https_sock) + 1;
 
+    std::cout << "HTTP on port " << HTTP_PORT << ", HTTPS on port " << HTTPS_PORT << std::endl;
   //  log("HTTPS Server started on port " + std::to_string(PORT));
 
     while (true) {
