@@ -31,11 +31,12 @@
 
 
 
-#define HTTP_PORT 8080
-#define HTTPS_PORT 8443
 #define BUFFER_SIZE 8192
 #define WEBROOT "./www"
 #define UPLOAD_DIR "./uploads"
+
+int HTTP_PORT = 8080;
+int HTTPS_PORT = 8443;
 
 
 std::unordered_map<std::string, std::string> vhosts = {
@@ -303,8 +304,20 @@ int create_listening_socket(int port) {
     return sock;
 }
 
-int main() {
-    mkdir(UPLOAD_DIR, 0755);
+int main(int argc, char* argv[]) {
+	    // Parse command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if ((arg == "--http" || arg == "-h") && i + 1 < argc) {
+            HTTP_PORT = std::stoi(argv[++i]);
+        } else if ((arg == "--https" || arg == "-s") && i + 1 < argc) {
+            HTTPS_PORT = std::stoi(argv[++i]);
+        } else if (arg == "--help") {
+            std::cout << "Usage: " << argv[0] << " [--http <port>] [--https <port>]\n";
+            return 0;
+        }
+    }
+        mkdir(UPLOAD_DIR, 0755);
     SSL_library_init();
     SSL_load_error_strings();
     OpenSSL_add_all_algorithms();
