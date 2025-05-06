@@ -26,6 +26,8 @@
 #include <iostream>
 #include <cstring>
 #include <unordered_map>
+#include <vector>
+#include <string>
 
 
 
@@ -179,6 +181,26 @@ void handle_client(int client,SSL* ssl = nullptr) {
     std::string method, url, version;
     iss >> method >> url >> version;
     
+        std::string content_type;
+    int content_length = 0;
+    std::string line;
+    
+    
+    std::istringstream request2(buffer); // this must be valid
+
+
+    std::string host = "localhost";  // default fallback
+while (std::getline(request2, line) && line != "\r") {
+    if (line.find("Host:") != std::string::npos)
+        host = line.substr(line.find(":") + 2);
+    //host = host.substr(0, host.find(":"));
+    // ... other header parsing
+}
+std::string root = WEBROOT;
+if (vhosts.count(host)) {
+    root = vhosts[host];
+}
+
     std::string query_string;
     size_t qs_pos = url.find('?');
     if (qs_pos != std::string::npos) {
@@ -186,7 +208,7 @@ void handle_client(int client,SSL* ssl = nullptr) {
         url = url.substr(0, qs_pos);
     }
     
-    std::string filepath = WEBROOT + url;
+    std::string filepath = root + url;
    // if (filepath.back() == '/') filepath += "index.html";
 
 
@@ -286,8 +308,8 @@ int main() {
         return 1;
     }
 
-    int http_sock = create_listening_socket(8080);
-    int https_sock = create_listening_socket(8443);
+    int http_sock = create_listening_socket(HTTP_PORT);
+    int https_sock = create_listening_socket(HTTPS_PORT);
         fd_set readfds;
     int maxfd = std::max(http_sock, https_sock) + 1;
 
