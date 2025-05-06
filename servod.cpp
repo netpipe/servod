@@ -61,17 +61,23 @@ std::string get_mime_type(const std::string& path) {
     return "application/octet-stream";
 }
 
-void send_response(SSL* ssl, const std::string& status, const std::string& content_type, const std::string& body) {
+void send_response(int client, SSL* ssl, const std::string& status, const std::string& content_type, const std::string& body) {
     std::ostringstream oss;
     oss << "HTTP/1.0 " << status << "\r\n"
         << "Content-Type: " << content_type << "\r\n"
         << "Content-Length: " << body.size() << "\r\n"
         << "Connection: close\r\n\r\n"
         << body;
-    SSL_write(ssl, oss.str().c_str(), oss.str().length());
+
+    const std::string response = oss.str();
+    if (ssl) {
+        SSL_write(ssl, response.c_str(), response.length());
+    } else {
+        send(client, response.c_str(), response.length(), 0);
+    }
 }
 
-void handle_php_cgi(SSL* ssl, const std::string& path, const std::string& query_string, const std::string& method, const std::string& post_data = "") {
+void handle_php_cgi(int client,SSL* ssl, const std::string& path, const std::string& query_string, const std::string& method, const std::string& post_data = "") {
     int cgi_output[2], cgi_input[2];
     pipe(cgi_output);
     pipe(cgi_input);
@@ -139,7 +145,7 @@ output << body;
         waitpid(pid, NULL, 0);
 
         std::string out_str = output.str();
-        send_response(ssl, "200 OK", "text/html", out_str);
+        send_response(client,ssl, "200 OK", "text/html", out_str);
     }
 }
 
@@ -161,7 +167,7 @@ std::string save_uploaded_file(const std::string& data, const std::string& bound
 void handle_client(int client,SSL* ssl = nullptr) {
     char buffer[BUFFER_SIZE];
     int bytes = ssl ? SSL_read(ssl, buffer, BUFFER_SIZE) : recv(client, buffer, BUFFER_SIZE, 0);
-    std::cout << "Received " << bytes << " bytes from client\n";
+    //std::cout << "Received " << bytes << " bytes from client\n";
         if (bytes <= 0) {
         if (ssl) SSL_free(ssl);
         close(client);
@@ -172,8 +178,6 @@ void handle_client(int client,SSL* ssl = nullptr) {
     std::istringstream iss(request);
     std::string method, url, version;
     iss >> method >> url >> version;
-
-    
     
     std::string query_string;
     size_t qs_pos = url.find('?');
@@ -182,8 +186,6 @@ void handle_client(int client,SSL* ssl = nullptr) {
         url = url.substr(0, qs_pos);
     }
     
-
-// std::string filepath = root + url;
     std::string filepath = WEBROOT + url;
    // if (filepath.back() == '/') filepath += "index.html";
 
@@ -207,7 +209,7 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
 
     struct stat st;
     if (stat(filepath.c_str(), &st) == -1) {
-        send_response(ssl, "404 Not Found", "text/plain", "404 Not Found");
+        send_response(client,ssl, "404 Not Found", "text/plain", "404 Not Found");
         log("404 for " + filepath);
     if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
         return;
@@ -234,17 +236,17 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
    
    
     if (filepath.ends_with(".php")) {
-        handle_php_cgi(ssl, filepath, query_string, method, post_data);
+        handle_php_cgi(client,ssl, filepath, query_string, method, post_data);
     } else if (url == "/upload" && method == "POST") {
         size_t bpos = request.find("boundary=");
         std::string boundary = (bpos != std::string::npos) ? "--" + request.substr(bpos + 9, request.find("\r\n", bpos) - bpos - 9) : "";
         std::string filename = save_uploaded_file(post_data, boundary);
-        send_response(ssl, "200 OK", "text/plain", "File uploaded: " + filename);
+        send_response(client,ssl, "200 OK", "text/plain", "File uploaded: " + filename);
     } else {
         std::ifstream file(filepath, std::ios::binary);
         std::ostringstream oss;
         oss << file.rdbuf();
-        send_response(ssl, "200 OK", get_mime_type(filepath), oss.str());
+        send_response(client,ssl, "200 OK", get_mime_type(filepath), oss.str());
     }
     
     if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
@@ -317,7 +319,7 @@ if (SSL_accept(ssl) <= 0) {
     ERR_print_errors_fp(stderr);
     SSL_free(ssl);
     close(client2);
-    continue;  // <-- Add this
+    continue;
 } else {
                 std::thread(handle_client, client2, ssl).detach();
           }}
