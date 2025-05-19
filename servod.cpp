@@ -327,8 +327,13 @@ int main(int argc, char* argv[]) {
 	// Parse command-line arguments
     std::string CertS = "cert.pem";
     std::string KeyS = "key.pem";
+#ifdef __APPLE__
     getcwd(cwd, sizeof(cwd)) ;
 cwd2 = cwd;
+#else
+   cwd = std::filesystem::current_path();
+cwd2 = cwd;
+#endif
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if ((arg == "--http" || arg == "-h") && i + 1 < argc) {
