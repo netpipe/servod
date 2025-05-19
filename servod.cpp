@@ -336,9 +336,9 @@ cwd2 = cwd;
         } else if ((arg == "--https" || arg == "-s") && i + 1 < argc) {
             HTTPS_PORT = std::stoi(argv[++i]);
            } else if ((arg == "--cert" || arg == "-c") && i + 1 < argc) {
-                        CertS = std::stoi(argv[++i]);
+                        CertS = argv[++i];
                        } else if ((arg == "--key" || arg == "-k") && i + 1 < argc) {
-                                    KeyS = std::stoi(argv[++i]);
+                                    KeyS = argv[++i];
         } else if (arg == "--help") {
             std::cout << "Usage: " << argv[0] << " [--http <port>] [--https <port>]\n";
             return 0;

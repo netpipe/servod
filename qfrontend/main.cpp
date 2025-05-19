@@ -35,8 +35,10 @@ public:
 
         httpPort = new QLineEdit("8080");
         httpsPort = new QLineEdit("8443");
-        certFile = new QLineEdit("cert.pem");
-        keyFile = new QLineEdit("key.pem");
+        certFile = new QLineEdit(QApplication::applicationDirPath() + "/" +"cert.pem");
+        keyFile = new QLineEdit(QApplication::applicationDirPath() + "/" +"key.pem");
+       // certFile = new QLineEdit("cert.pem");
+        //keyFile = new QLineEdit("key.pem");
 
         log = new QTextEdit();
         log->setReadOnly(true);
@@ -67,8 +69,8 @@ layout->addWidget(startButton);
                 QStringList args = {
                     "--http", httpPort->text(),
                     "--https", httpsPort->text(),
-                    "--cert", certFile->text(),
-                    "--key", keyFile->text()
+                    "--cert",  certFile->text(),
+                    "--key",  keyFile->text()
                 };
 
                 serverProcess->start(program, args);
