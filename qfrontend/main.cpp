@@ -7,11 +7,11 @@
 #include <QTextEdit>
 #include <QThread>
 #include <QLabel>
-#include <QTcpSocket>
 #include <QProcess>
 #include <QFile>
 #include <QMap>
 #include <QDebug>
+#include <QProcess>
 
 // Simplified config struct
 struct ServerConfig {
@@ -53,27 +53,48 @@ public:
         layout->addWidget(startBtn);
         layout->addWidget(log);
 
-        connect(startBtn, &QPushButton::clicked, this, &ServerWindow::startServer);
+        QTextEdit *logOutput = new QTextEdit;
+        logOutput->setReadOnly(true);
+        layout->addWidget(logOutput);
+
+        QProcess *serverProcess = new QProcess();
+
+        QObject::connect(startBtn, &QPushButton::clicked, [&]() {
+            if (serverProcess->state() == QProcess::NotRunning) {
+                // Replace with your actual binary path and args
+                QString program = "servod";
+                QStringList args = {
+                    "--http-port", httpPort->text(),
+                    "--https-port", httpsPort->text(),
+                    "--cert", certFile->text(),
+                    "--key", keyFile->text()
+                };
+
+                serverProcess->start(program, args);
+                logOutput->append("Starting server...");
+            } else {
+                logOutput->append("Server already running.");
+            }
+        });
+
+        QObject::connect(serverProcess, &QProcess::readyReadStandardOutput, [&]() {
+            logOutput->append(QString::fromUtf8(serverProcess->readAllStandardOutput()));
+        });
+
+        QObject::connect(serverProcess, &QProcess::readyReadStandardError, [&]() {
+            logOutput->append(QString::fromUtf8(serverProcess->readAllStandardError()));
+        });
+
+        QObject::connect(serverProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                         [&](int exitCode, QProcess::ExitStatus) {
+            logOutput->append("Server exited with code: " + QString::number(exitCode));
+        });
+
+
+
     }
 
 public slots:
-    void startServer() {
-        ServerConfig cfg;
-        cfg.httpPort = httpPort->text().toInt();
-        cfg.httpsPort = httpsPort->text().toInt();
-        cfg.certFile = certFile->text();
-        cfg.keyFile = keyFile->text();
-
-        cfg.virtualHosts.insert("localhost", "www");
-
-        //server = new WebServer(cfg, this);
-        //connect(server, &QThread::finished, this, [this]() {
-        //    log->append("Server stopped.");
-       // });
-
-        log->append("Starting server...");
-        //server->start();
-    }
 
 private:
     QLineEdit *httpPort, *httpsPort, *certFile, *keyFile;
