@@ -28,6 +28,8 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <cassert>
+#include <string_view>
 
 int HTTP_PORT = 8080;
 int HTTPS_PORT = 8443;
@@ -36,6 +38,10 @@ bool https_enabled = true;
 #define WEBROOT "./www"
 #define UPLOAD_DIR "./uploads"
 
+bool ends_with(const std::string& suffix, const std::string& str) {
+    return str.size() >= suffix.size() &&
+           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
 
 std::unordered_map<std::string, std::string> vhosts = {
     {"localhost", "www"},
@@ -52,13 +58,13 @@ void log(const std::string& msg) {
 }
 
 std::string get_mime_type(const std::string& path) {
-    if (path.ends_with(".html")) return "text/html";
-    if (path.ends_with(".css")) return "text/css";
-    if (path.ends_with(".js")) return "application/javascript";
-    if (path.ends_with(".png")) return "image/png";
-    if (path.ends_with(".jpg") || path.ends_with(".jpeg")) return "image/jpeg";
-    if (path.ends_with(".gif")) return "image/gif";
-    if (path.ends_with(".php")) return "text/html";
+    if (ends_with(".html",path)) return "text/html";
+    if (ends_with(".css",path)) return "text/css";
+    if (ends_with(".js",path)) return "application/javascript";
+    if (ends_with(".png",path)) return "image/png";
+    if (ends_with(".jpg",path) || ends_with(".jpeg",path)) return "image/jpeg";
+    if (ends_with(".gif",path)) return "image/gif";
+    if (ends_with(".php",path)) return "text/html";
     return "application/octet-stream";
 }
 
@@ -276,7 +282,7 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
     }
    
    
-    if (filepath.ends_with(".php")) {
+    if (ends_with(".php",filepath)) {
         handle_php_cgi(client,ssl, filepath, query_string, method, post_data);
     } else if (url == "/upload" && method == "POST") {
         size_t bpos = request.find("boundary=");
@@ -310,12 +316,18 @@ int create_listening_socket(int port) {
 
 int main(int argc, char* argv[]) {
 	// Parse command-line arguments
+    std::string CertS = "cert.pem";
+    std::string KeyS = "key.pem";
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if ((arg == "--http" || arg == "-h") && i + 1 < argc) {
             HTTP_PORT = std::stoi(argv[++i]);
         } else if ((arg == "--https" || arg == "-s") && i + 1 < argc) {
             HTTPS_PORT = std::stoi(argv[++i]);
+           } else if ((arg == "--cert" || arg == "-c") && i + 1 < argc) {
+                        CertS = std::stoi(argv[++i]);
+                       } else if ((arg == "--key" || arg == "-k") && i + 1 < argc) {
+                                    KeyS = std::stoi(argv[++i]);
         } else if (arg == "--help") {
             std::cout << "Usage: " << argv[0] << " [--http <port>] [--https <port>]\n";
             return 0;
@@ -333,8 +345,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0 ||
-        SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx, CertS.c_str(), SSL_FILETYPE_PEM) <= 0 ||
+        SSL_CTX_use_PrivateKey_file(ctx, KeyS.c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         return 1;
     }
