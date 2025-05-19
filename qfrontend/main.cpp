@@ -62,10 +62,19 @@ public:
 layout->addWidget(startButton);
         connect(startButton, &QPushButton::clicked, this, [=]() {
             if (serverProcess->state() == QProcess::NotRunning) {
-                QString program = "./servod";  // adjust to full path if needed
+                QString program = QApplication::applicationDirPath() +"/servod";  // adjust to full path if needed
+                logOutput->append(program);
+                QStringList args = {
+                    "--http", httpPort->text(),
+                    "--https", httpsPort->text(),
+                    "--cert", certFile->text(),
+                    "--key", keyFile->text()
+                };
+
+                serverProcess->start(program, args);
               //  QProcess::startDetached("./servod");
 //serverProcess->startDetached(program);
-                serverProcess->start(program);
+              //  serverProcess->start(program);
                 if (!serverProcess->waitForStarted(1000)) {
                     logOutput->append("❌ Failed to start servod.");
                     return;
