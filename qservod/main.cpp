@@ -66,8 +66,8 @@ private slots:
         tcpSocket->deleteLater();
 
         // Load cert and key
-        QSslCertificate cert("./cert.pem");
-        QSslKey key("./key.pem", QSsl::Rsa);
+        QSslCertificate cert(":/cert.pem");
+        QSslKey key(":/key.pem", QSsl::Rsa);
         QSslConfiguration sslConfig = QSslConfiguration::defaultConfiguration();
         sslConfig.setLocalCertificate(cert);
         sslConfig.setPrivateKey(key);

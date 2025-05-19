@@ -32,15 +32,20 @@
 #include <unistd.h>
 #include <limits.h>
 #include <iostream>
+#ifdef __APPLE__
+#include <pwd.h>
+#include <mach-o/dyld.h>
+#include <limits.h>
+#endif
 
 int HTTP_PORT = 8080;
 int HTTPS_PORT = 8443;
 bool https_enabled = true;
 #define BUFFER_SIZE 8192
 #define WEBROOT "/www"
-#define UPLOAD_DIR "./uploads"
+#define UPLOAD_DIR "/uploads"
 
-char cwd[PATH_MAX];
+std::string cwd;
 std::string cwd2;
 
 bool ends_with(const std::string& suffix, const std::string& str) {
@@ -110,8 +115,9 @@ void handle_php_cgi(int client,SSL* ssl, const std::string& path, const std::str
             setenv("CONTENT_LENGTH", std::to_string(post_data.size()).c_str(), 1);
         }
 std::string test = cwd;
-test+= "/php-cgi";
-        execlp(test.c_str(), test.c_str(), NULL);
+test += "/php-cgi";
+//std::cout << test;
+        execlp( test.c_str(),test.c_str(),"/www/php-cgi", NULL);
         perror("execlp");
         exit(1);
     } else {
@@ -179,7 +185,7 @@ std::string save_uploaded_file(const std::string& data, const std::string& bound
     size_t end = data.find(boundary, start);
     if (end == std::string::npos) return "";
     std::string content = data.substr(start, end - start);
-    std::string filename = UPLOAD_DIR;
+    std::string filename = cwd + UPLOAD_DIR;
     filename += "/upload_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
     std::ofstream out(filename, std::ios::binary);
     out.write(content.c_str(), content.size());
@@ -219,7 +225,8 @@ while (std::getline(request2, line) && line != "\r") {
 }
 
 
-std::string root =cwd2 + WEBROOT;
+std::string root =cwd2;
+//std::string root = WEBROOT;
 if (vhosts.count(host)) {
     root = vhosts[host];
 }
@@ -232,7 +239,7 @@ if (vhosts.count(host)) {
     }
     
     std::string filepath = root + url;
-   // if (filepath.back() == '/') filepath += "index.html";
+ //   if (filepath.back() == '/') filepath += "index.php";
    
 // If SSL is not used, redirect to HTTPS
 if (!ssl) {
@@ -322,17 +329,36 @@ int create_listening_socket(int port) {
     listen(sock, SOMAXCONN);
     return sock;
 }
-
+#include <libgen.h>
 int main(int argc, char* argv[]) {
 	// Parse command-line arguments
     std::string CertS = "cert.pem";
     std::string KeyS = "key.pem";
 #ifdef __APPLE__
-    getcwd(cwd, sizeof(cwd)) ;
-cwd2 = cwd;
+   // getcwd(cwd, sizeof(cwd)) ;
+
+    char buf [PATH_MAX];
+    uint32_t bufsize = PATH_MAX;
+    if(!_NSGetExecutablePath(buf, &bufsize))
+      puts(buf);
+
+ //   std::cout << "test" ;
+   // std::cout << dirname(buf) ;
+
+       cwd = dirname(buf);
+cwd2 = cwd + WEBROOT;      //  cwd;
+
+   // uid_t uid = getuid();
+   // struct passwd *pw = getpwuid(uid);
+   // if (pw) {
+
+   //     std::string test = pw->pw_name;
+     //   cwd = "/Users/"+ test;
+//cwd2 = "/Users/"+ test + WEBROOT;      //  cwd;
+ //   }
 #else
    cwd = std::filesystem::current_path();
-cwd2 = cwd;
+cwd2 = cwd + WEBROOT;
 #endif
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
