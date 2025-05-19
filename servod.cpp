@@ -29,14 +29,19 @@
 #include <vector>
 #include <string>
 #include <cassert>
-#include <string_view>
+#include <unistd.h>
+#include <limits.h>
+#include <iostream>
 
 int HTTP_PORT = 8080;
 int HTTPS_PORT = 8443;
 bool https_enabled = true;
 #define BUFFER_SIZE 8192
-#define WEBROOT "./www"
+#define WEBROOT "/www"
 #define UPLOAD_DIR "./uploads"
+
+char cwd[PATH_MAX];
+std::string cwd2;
 
 bool ends_with(const std::string& suffix, const std::string& str) {
     return str.size() >= suffix.size() &&
@@ -104,8 +109,9 @@ void handle_php_cgi(int client,SSL* ssl, const std::string& path, const std::str
         if (method == "POST") {
             setenv("CONTENT_LENGTH", std::to_string(post_data.size()).c_str(), 1);
         }
-
-        execlp("php-cgi", "php-cgi", NULL);
+std::string test = cwd;
+test+= "/php-cgi";
+        execlp(test.c_str(), test.c_str(), NULL);
         perror("execlp");
         exit(1);
     } else {
@@ -211,7 +217,9 @@ while (std::getline(request2, line) && line != "\r") {
     //host = host.substr(0, host.find(":"));
     // ... other header parsing
 }
-std::string root = WEBROOT;
+
+
+std::string root =cwd2 + WEBROOT;
 if (vhosts.count(host)) {
     root = vhosts[host];
 }
@@ -299,6 +307,7 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
     if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
     close(client);
 }
+
 int create_listening_socket(int port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     int opt = 1;
@@ -318,6 +327,8 @@ int main(int argc, char* argv[]) {
 	// Parse command-line arguments
     std::string CertS = "cert.pem";
     std::string KeyS = "key.pem";
+    getcwd(cwd, sizeof(cwd)) ;
+cwd2 = cwd;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if ((arg == "--http" || arg == "-h") && i + 1 < argc) {
