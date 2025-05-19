@@ -59,7 +59,7 @@ public:
         logOutput->setReadOnly(true);
 
         QPushButton *startButton = new QPushButton("Start Webserver", this);
-
+layout->addWidget(startButton);
         connect(startButton, &QPushButton::clicked, this, [=]() {
             if (serverProcess->state() == QProcess::NotRunning) {
                 QString program = "./servod";  // adjust to full path if needed
@@ -100,8 +100,6 @@ private:
     QTextEdit* log;
     QProcess *serverProcess = nullptr;
     QTextEdit *logOutput = nullptr;
-
-    //WebServer* server = nullptr;
 };
 
 int main(int argc, char* argv[]) {
