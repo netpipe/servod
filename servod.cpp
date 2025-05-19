@@ -370,6 +370,10 @@ cwd2 = cwd + WEBROOT;
                         CertS = argv[++i];
                        } else if ((arg == "--key" || arg == "-k") && i + 1 < argc) {
                                     KeyS = argv[++i];
+        } else if ((arg == "--wwwHome" || arg == "-k") && i + 1 < argc) {
+                 cwd = argv[++i];
+                 cwd2 = cwd + WEBROOT;
+
         } else if (arg == "--help") {
             std::cout << "Usage: " << argv[0] << " [--http <port>] [--https <port>]\n";
             return 0;
