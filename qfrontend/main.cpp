@@ -41,7 +41,6 @@ public:
         log = new QTextEdit();
         log->setReadOnly(true);
 
-        auto* startBtn = new QPushButton("Start Server");
         layout->addWidget(portLabel);
         layout->addWidget(httpPort);
         layout->addWidget(httpsLabel);
@@ -50,46 +49,46 @@ public:
         layout->addWidget(certFile);
         layout->addWidget(keyLabel);
         layout->addWidget(keyFile);
-        layout->addWidget(startBtn);
         layout->addWidget(log);
 
         QTextEdit *logOutput = new QTextEdit;
         logOutput->setReadOnly(true);
         layout->addWidget(logOutput);
 
-        QProcess *serverProcess = new QProcess();
+        serverProcess = new QProcess(this);
+        logOutput->setReadOnly(true);
 
-        QObject::connect(startBtn, &QPushButton::clicked, [&]() {
+        QPushButton *startButton = new QPushButton("Start Webserver", this);
+
+        connect(startButton, &QPushButton::clicked, this, [=]() {
             if (serverProcess->state() == QProcess::NotRunning) {
-                // Replace with your actual binary path and args
-                QString program = "servod";
-                QStringList args = {
-                    "--http-port", httpPort->text(),
-                    "--https-port", httpsPort->text(),
-                    "--cert", certFile->text(),
-                    "--key", keyFile->text()
-                };
+                QString program = "./servod";  // adjust to full path if needed
+              //  QProcess::startDetached("./servod");
+//serverProcess->startDetached(program);
+                serverProcess->start(program);
+                if (!serverProcess->waitForStarted(1000)) {
+                    logOutput->append("❌ Failed to start servod.");
+                    return;
+                }
 
-                serverProcess->start(program, args);
-                logOutput->append("Starting server...");
+                logOutput->append("✅ servod started.");
             } else {
-                logOutput->append("Server already running.");
+                logOutput->append("ℹ️ servod is already running.");
             }
         });
 
-        QObject::connect(serverProcess, &QProcess::readyReadStandardOutput, [&]() {
+        connect(serverProcess, &QProcess::readyReadStandardOutput, this, [=]() {
             logOutput->append(QString::fromUtf8(serverProcess->readAllStandardOutput()));
         });
 
-        QObject::connect(serverProcess, &QProcess::readyReadStandardError, [&]() {
+        connect(serverProcess, &QProcess::readyReadStandardError, this, [=]() {
             logOutput->append(QString::fromUtf8(serverProcess->readAllStandardError()));
         });
 
-        QObject::connect(serverProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                         [&](int exitCode, QProcess::ExitStatus) {
-            logOutput->append("Server exited with code: " + QString::number(exitCode));
+        connect(serverProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+                this, [=](int code, QProcess::ExitStatus status) {
+            logOutput->append("❗️ servod exited with code: " + QString::number(code));
         });
-
 
 
     }
@@ -99,6 +98,9 @@ public slots:
 private:
     QLineEdit *httpPort, *httpsPort, *certFile, *keyFile;
     QTextEdit* log;
+    QProcess *serverProcess = nullptr;
+    QTextEdit *logOutput = nullptr;
+
     //WebServer* server = nullptr;
 };
 
