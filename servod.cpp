@@ -370,7 +370,7 @@ cwd2 = cwd + WEBROOT;
                         CertS = argv[++i];
                        } else if ((arg == "--key" || arg == "-k") && i + 1 < argc) {
                                     KeyS = argv[++i];
-        } else if ((arg == "--wwwHome" || arg == "-k") && i + 1 < argc) {
+        } else if ((arg == "--wwwHome" || arg == "-W") && i + 1 < argc) {
                  cwd = argv[++i];
                  cwd2 = cwd + WEBROOT;
 

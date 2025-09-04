@@ -24,9 +24,9 @@ HEADERS += \
 
 FORMS += \
 
-LIBS += -L/Users/macbook2015/Desktop/brew/lib -lssl -lcrypto
+LIBS +=
 
-INCLUDEPATH += /Users/macbook2015/Desktop/brew/include /Users/macbook2015/Desktop/brew/lib
+INCLUDEPATH +=
 
 
 # Default rules for deployment.

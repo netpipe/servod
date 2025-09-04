@@ -12,6 +12,8 @@
 #include <QMap>
 #include <QDebug>
 #include <QProcess>
+#include <QDesktopServices>
+#include <QUrl>
 
 // Simplified config struct
 struct ServerConfig {
@@ -60,8 +62,12 @@ public:
         serverProcess = new QProcess(this);
         logOutput->setReadOnly(true);
 
+        qputenv("DYLD_LIBRARY_PATH",  QApplication::applicationDirPath().toUtf8() + "/libs");
+
         QPushButton *startButton = new QPushButton("Start Webserver", this);
+           QPushButton *HomeButton = new QPushButton("HomeFolder", this);
 layout->addWidget(startButton);
+ layout->addWidget(HomeButton);
         connect(startButton, &QPushButton::clicked, this, [=]() {
             if (serverProcess->state() == QProcess::NotRunning) {
                 QString program = QApplication::applicationDirPath() +"/servod";  // adjust to full path if needed
@@ -87,6 +93,15 @@ layout->addWidget(startButton);
                 logOutput->append("ℹ️ servod is already running.");
             }
         });
+
+
+
+
+                    QObject::connect(HomeButton, &QPushButton::clicked, [&]() {
+                        QString folderPath = QApplication::applicationDirPath() + "/www"; // Replace with the actual path
+                        QUrl url = QUrl::fromLocalFile(folderPath);
+                        QDesktopServices::openUrl(url);
+                    });
 
         connect(serverProcess, &QProcess::readyReadStandardOutput, this, [=]() {
             logOutput->append(QString::fromUtf8(serverProcess->readAllStandardOutput()));
