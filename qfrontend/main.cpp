@@ -63,6 +63,7 @@ public:
         logOutput->setReadOnly(true);
 
         qputenv("DYLD_LIBRARY_PATH",  QApplication::applicationDirPath().toUtf8() + "/libs");
+ qputenv("MIBDIRS",  QApplication::applicationDirPath().toUtf8() + "/mibs");
 
         QPushButton *startButton = new QPushButton("Start Webserver", this);
            QPushButton *HomeButton = new QPushButton("HomeFolder", this);
@@ -89,6 +90,8 @@ layout->addWidget(startButton);
                 }
 
                 logOutput->append("✅ servod started.");
+                QString link = "http://localhost:8080"; // Replace with your desired URL
+                QDesktopServices::openUrl(QUrl(link));
             } else {
                 logOutput->append("ℹ️ servod is already running.");
             }
