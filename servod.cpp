@@ -207,12 +207,12 @@ void handle_client(int client,SSL* ssl = nullptr) {
     std::istringstream iss(request);
     std::string method, url, version;
     iss >> method >> url >> version;
-    
+
         std::string content_type;
     int content_length = 0;
     std::string line;
-    
-    
+
+
     std::istringstream request2(buffer); // this must be valid
 
 
@@ -237,10 +237,10 @@ if (vhosts.count(host)) {
         query_string = url.substr(qs_pos + 1);
         url = url.substr(0, qs_pos);
     }
-    
+
     std::string filepath = root + url;
  //   if (filepath.back() == '/') filepath += "index.php";
-   
+
 // If SSL is not used, redirect to HTTPS
 if (!ssl) {
    // redirect_to_https(client, host, filepath,HTTPS_PORT);
@@ -295,8 +295,8 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
             }
         }
     }
-   
-   
+
+
     if (ends_with(".php",filepath)) {
         handle_php_cgi(client,ssl, filepath, query_string, method, post_data);
     } else if (url == "/upload" && method == "POST") {
@@ -310,7 +310,7 @@ if (stat(filepath.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
         oss << file.rdbuf();
         send_response(client,ssl, "200 OK", get_mime_type(filepath), oss.str());
     }
-    
+
     if (ssl) SSL_shutdown(ssl), SSL_free(ssl);
     close(client);
 }
@@ -331,7 +331,7 @@ int create_listening_socket(int port) {
 }
 #include <libgen.h>
 int main(int argc, char* argv[]) {
-	// Parse command-line arguments
+    // Parse command-line arguments
     std::string CertS = "cert.pem";
     std::string KeyS = "key.pem";
 #ifdef __APPLE__
@@ -400,12 +400,12 @@ cwd2 = cwd + WEBROOT;
     int http_sock = create_listening_socket(HTTP_PORT);
     int https_sock;
     if(https_enabled){
-    		https_sock = create_listening_socket(HTTPS_PORT) ;  
-    		
-    		 }else{    		https_sock =-1 ;  
-    		}
-    		 
-    		 
+            https_sock = create_listening_socket(HTTPS_PORT) ;
+
+             }else{    		https_sock =-1 ;
+            }
+
+
         fd_set readfds;
     int maxfd = std::max(http_sock, https_sock) + 1;
 
@@ -425,14 +425,14 @@ cwd2 = cwd + WEBROOT;
         if (FD_ISSET(http_sock, &readfds)) {
             int client = accept(http_sock, nullptr, nullptr);
             std::thread(handle_client, client, nullptr).detach();
-           
+
         }
 
         if (FD_ISSET(https_sock, &readfds)) {
             int client2 = accept(https_sock, nullptr, nullptr);
             SSL* ssl = SSL_new(ctx);
             SSL_set_fd(ssl, client2);
-           
+
 if (SSL_accept(ssl) <= 0) {
     ERR_print_errors_fp(stderr);
     SSL_free(ssl);
