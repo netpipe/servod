@@ -20,6 +20,7 @@
 #include <QDateTime>
 #include <QUrl>
 #include <QDebug>
+#include <QDesktopServices>
 
 // Handles a single client connection (works for both HTTP and HTTPS)
 class HttpConnection : public QObject {
@@ -402,8 +403,18 @@ int main(int argc, char *argv[]) {
     QTextEdit *log = new QTextEdit;
     log->setReadOnly(true);
     QPushButton *startBtn = new QPushButton("Start Server");
+    QPushButton *HomeButton = new QPushButton("HomeFolder");
     layout->addWidget(log);
     layout->addWidget(startBtn);
+     layout->addWidget(HomeButton);
+
+
+
+    QObject::connect(HomeButton, &QPushButton::clicked, [&]() {
+        QString folderPath = QApplication::applicationDirPath() + "/www"; // Replace with the actual path
+        QUrl url = QUrl::fromLocalFile(folderPath);
+        QDesktopServices::openUrl(url);
+    });
 
     WebServer *server = new WebServer;
     QObject::connect(startBtn, &QPushButton::clicked, [=] {
